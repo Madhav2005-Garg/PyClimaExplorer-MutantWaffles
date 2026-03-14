@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional
 
 import numpy as np
 import xarray as xr
@@ -16,6 +17,7 @@ DATASET_PATH = Path(__file__).resolve().parents[2] / "data" / DATASET_FILENAME
 
 DEFAULT_START = datetime(1850, 1, 1)
 DEFAULT_END = datetime(2025, 12, 31)
+GLOBE_POINT_LIMIT = 3600
 
 
 class RegionBounds(BaseModel):
@@ -128,6 +130,79 @@ def _time_series_preview(data_array: xr.DataArray) -> List[Dict[str, float]]:
     return preview
 
 
+def _spatial_grid(data_array: xr.DataArray, target_points: int = 40) -> Optional[Dict[str, List[List[float]]]]:
+    """Return a coarse lat/lon grid for heatmap visualizations."""
+
+    lat_dim = next((dim for dim in data_array.dims if dim.lower().startswith("lat")), None)
+    lon_dim = next((dim for dim in data_array.dims if dim.lower().startswith("lon")), None)
+    if lat_dim is None or lon_dim is None:
+        return None
+
+    collapsed = data_array
+    for dim in list(data_array.dims):
+        if dim not in (lat_dim, lon_dim):
+            collapsed = collapsed.mean(dim=dim, skipna=True)
+
+    collapsed = collapsed.transpose(lat_dim, lon_dim)
+    lat_vals = collapsed[lat_dim].values
+    lon_vals = collapsed[lon_dim].values
+    if lat_vals.size == 0 or lon_vals.size == 0:
+        return None
+
+    lat_step = max(1, lat_vals.size // target_points)
+    lon_step = max(1, lon_vals.size // target_points)
+
+    sampled_lats = lat_vals[::lat_step].astype(float).tolist()
+    sampled_lons = lon_vals[::lon_step].astype(float).tolist()
+    sampled_values = collapsed.values[::lat_step, ::lon_step]
+    value_rows = np.asarray(sampled_values, dtype=float).tolist()
+
+    return {"lat": sampled_lats, "lon": sampled_lons, "values": value_rows}
+
+
+def _globe_points(grid: Optional[Dict[str, List[List[float]]]], limit: int = GLOBE_POINT_LIMIT) -> List[Dict[str, float]]:
+    """Flatten the spatial grid into lat/lon/value points for globe rendering."""
+
+    if not grid:
+        return []
+
+    latitudes = grid.get("lat") or []
+    longitudes = grid.get("lon") or []
+    values = grid.get("values") or []
+
+    lat_count = len(latitudes)
+    lon_count = len(longitudes)
+    if lat_count == 0 or lon_count == 0 or not values:
+        return []
+
+    total_cells = lat_count * lon_count
+    target = min(limit, total_cells)
+    if target <= 0:
+        return []
+
+    sample_dim = max(1, int(math.sqrt(target)))
+    lat_stride = max(1, int(math.ceil(lat_count / sample_dim)))
+    lon_stride = max(1, int(math.ceil(lon_count / sample_dim)))
+
+    points: List[Dict[str, float]] = []
+    for i in range(0, lat_count, lat_stride):
+        if i >= len(values):
+            break
+        row = values[i]
+        if row is None:
+            continue
+        for j in range(0, lon_count, lon_stride):
+            if j >= len(row):
+                break
+            val = row[j]
+            if np.isnan(val):
+                continue
+            points.append({"lat": float(latitudes[i]), "lon": float(longitudes[j]), "value": float(val)})
+            if len(points) >= limit:
+                return points
+    return points
+
+
 def _ensure_datetime(value: datetime | str) -> datetime:
     """Normalize string inputs into datetime objects."""
 
@@ -222,6 +297,9 @@ def filter_wind_data(
             "end": _time_to_string(times[-1], dtype),
         }
 
+    spatial_grid = _spatial_grid(data_array)
+    globe_points = _globe_points(spatial_grid)
+
     response = {
         "dataset": DATASET_FILENAME,
         "data_variable": data_var_name,
@@ -235,4 +313,8 @@ def filter_wind_data(
     }
     if time_range:
         response["time_range"] = time_range
+    if spatial_grid:
+        response["spatial_grid"] = spatial_grid
+    if globe_points:
+        response["globe_points"] = globe_points
     return response
