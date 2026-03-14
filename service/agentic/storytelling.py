@@ -89,7 +89,9 @@ def _build_story_prompt(request: StoryRequest) -> str:
 
 def _build_comparison_prompt(request: ComparisonRequest) -> str:
     stats_a = [f"- {k}: {v}" for k, v in request.stats_a.items()] or ["- (no stats for A)"]
-    stats_b = [f"- {k}: {v}" for k, v in request.stats_b.items()] or ["- (no stats for B)"]
+    stats_b = [f"- {k}: {v}" for k, v in request.stats_b.items()] or [
+        "- (no stats for B)"
+    ]
     preview_a = [f"- {item.get('year')}: {item.get('value')}" for item in request.time_series_a] or [
         "- (no series A)"
     ]
