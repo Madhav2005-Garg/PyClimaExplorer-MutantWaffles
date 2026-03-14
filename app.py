@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv("service/agentic/.env")
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from geopy.geocoders import Nominatim
 
 from service.agentic.storytelling import ComparisonRequest, StoryRequest, generate_comparison, generate_story
 from service.dataProcessing.precipitation import DEFAULT_END as PRECIP_END
@@ -37,7 +41,7 @@ class Region(BaseModel):
     lat_min: float = -90.0
     lat_max: float = 90.0
     lon_min: float = -180.0
-    lon_max: float = 180.0
+    lon_max: float = 360.0
 
 
 class DataQuery(BaseModel):
@@ -45,6 +49,32 @@ class DataQuery(BaseModel):
     end_date: Optional[datetime] = None
     region: Optional[Region] = None
 
+
+class GeocodeRequest(BaseModel):
+    query: str
+
+@app.post("/api/geocode")
+def geocode(request: GeocodeRequest) -> dict:
+    try:
+        geolocator = Nominatim(user_agent="pyclimaexplorer_1.0")
+        location = geolocator.geocode(request.query)
+        if not location:
+            raise HTTPException(status_code=404, detail="Location not found")
+        # Define a small bounded box around the coordinate just for default querying
+        offset = 5.0
+        return {
+            "lat": location.latitude,
+            "lon": location.longitude,
+            "display_name": location.address,
+            "bounding_box": {
+                "lat_min": location.latitude - offset,
+                "lat_max": location.latitude + offset,
+                "lon_min": location.longitude - offset,
+                "lon_max": location.longitude + offset,
+            }
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 @app.get("/health")
 def health() -> dict:
@@ -93,12 +123,20 @@ def wind(query: DataQuery) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+import json
+
 @app.post("/api/story")
 def story(request: StoryRequest) -> dict:
     try:
         text = generate_story(request)
-        return {"story": text}
+        try:
+            parsed = json.loads(text)
+            return parsed
+        except json.JSONDecodeError:
+            return {"story": text, "risk_score": None}
     except Exception as exc:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -106,8 +144,14 @@ def story(request: StoryRequest) -> dict:
 def story_compare(request: ComparisonRequest) -> dict:
     try:
         text = generate_comparison(request)
-        return {"story": text}
+        try:
+            parsed = json.loads(text)
+            return parsed
+        except json.JSONDecodeError:
+            return {"story": text, "risk_score": None}
     except Exception as exc:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

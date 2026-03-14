@@ -17,7 +17,7 @@ DATASET_PATH = Path(__file__).resolve().parents[2] / "data" / DATASET_FILENAME
 
 DEFAULT_START = datetime(1850, 1, 1)
 DEFAULT_END = datetime(2025, 12, 31)
-GLOBE_POINT_LIMIT = 3600
+GLOBE_POINT_LIMIT = 100000
 
 
 class RegionBounds(BaseModel):
@@ -26,7 +26,7 @@ class RegionBounds(BaseModel):
 	lat_min: float = Field(-90.0, ge=-90.0, le=90.0)
 	lat_max: float = Field(90.0, ge=-90.0, le=90.0)
 	lon_min: float = Field(-180.0, ge=-180.0, le=360.0)
-	lon_max: float = Field(180.0, ge=-180.0, le=360.0)
+	lon_max: float = Field(360.0, ge=-180.0, le=360.0)
 
 	@model_validator(mode="after")
 	def validate_bounds(self) -> "RegionBounds":

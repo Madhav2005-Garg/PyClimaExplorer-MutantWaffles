@@ -4,6 +4,7 @@ function buildHeatmapTrace(spatialGrid, label) {
   if (!spatialGrid) return null;
   return {
     type: "heatmap",
+    zsmooth: "best",
     x: spatialGrid.lon,
     y: spatialGrid.lat,
     z: spatialGrid.values,
@@ -28,13 +29,24 @@ function buildTimeSeriesTrace(preview, label) {
   };
 }
 
-export default function VariableSection({ variable, data }) {
+export default function VariableSection({ variable, data, story }) {
   const heatmapTrace = buildHeatmapTrace(data.spatial_grid, variable);
   const timeSeriesTrace = buildTimeSeriesTrace(data.time_series_preview, variable);
 
   return (
     <section className="panel">
       <h3 className="card-title">{variable.toUpperCase()}</h3>
+      
+      {story && (
+        <div className="agentic-insight" style={{ marginBottom: "1.5rem", padding: "1rem", backgroundColor: "rgba(74, 214, 255, 0.05)", borderLeft: "4px solid #4ad6ff", borderRadius: "4px" }}>
+          <h4 style={{ margin: "0 0 0.5rem 0", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+             Agentic Insight ✨ 
+             {story.risk_score && <span style={{ fontSize: "0.85rem", padding: "0.2rem 0.5rem", background: "#f85f73", color: "#fff", borderRadius: "10px" }}>Risk Score: {story.risk_score}/10</span>}
+          </h4>
+          <p style={{ margin: 0, lineHeight: 1.5, fontSize: "0.95rem" }}>{story.story || "No insights found."}</p>
+        </div>
+      )}
+
       <div className="stats-grid">
         {Object.entries(data.statistics || {}).map(([key, value]) => (
           <div key={key} className="stat-card">

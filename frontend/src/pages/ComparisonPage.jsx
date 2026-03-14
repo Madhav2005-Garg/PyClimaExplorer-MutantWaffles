@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Plot from "react-plotly.js";
-import { fetchClimateSlice, formatDateRange } from "../api/client.js";
+import { fetchClimateSlice, formatDateRange, fetchGeocode, fetchStoryCompare } from "../api/client.js";
 
 const variableOptions = [
   { id: "temperature", label: "Temperature" },
@@ -25,13 +25,34 @@ const cssVar = (name, fallback) => {
   return value?.trim() || fallback;
 };
 
+const DEFAULT_RANGE_A = { start: 1948, end: 1983 };
+const DEFAULT_RANGE_B = { start: 1983, end: 2019 };
+const YEAR_MIN = 1948;
+const YEAR_MAX = 2019;
+
 export default function ComparisonPage({ theme = "dark" }) {
   const [variable, setVariable] = useState("temperature");
-  const [rangeA, setRangeA] = useState({ start: 1948, end: 1983 });
-  const [rangeB, setRangeB] = useState({ start: 1983, end: 2019 });
+  const [rangeA, setRangeA] = useState(DEFAULT_RANGE_A);
+  const [rangeB, setRangeB] = useState(DEFAULT_RANGE_B);
   const [chartType, setChartType] = useState("time");
+  
+  const rangeStyleA = {
+    "--start": (((rangeA.start - YEAR_MIN) / (YEAR_MAX - YEAR_MIN)) * 100).toFixed(1),
+    "--end": (((rangeA.end - YEAR_MIN) / (YEAR_MAX - YEAR_MIN)) * 100).toFixed(1),
+  };
+  const rangeStyleB = {
+    "--start": (((rangeB.start - YEAR_MIN) / (YEAR_MAX - YEAR_MIN)) * 100).toFixed(1),
+    "--end": (((rangeB.end - YEAR_MIN) / (YEAR_MAX - YEAR_MIN)) * 100).toFixed(1),
+  };
+  
+  const [locationStr, setLocationStr] = useState("");
+  const [geocodedRegion, setGeocodedRegion] = useState(null);
+  const [locationLabel, setLocationLabel] = useState("Global");
+
   const [data, setData] = useState(null);
+  const [storyOutput, setStoryOutput] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [storyLoading, setStoryLoading] = useState(false);
   const [error, setError] = useState("");
   const plotTheme = useMemo(
     () => ({
@@ -53,21 +74,67 @@ export default function ComparisonPage({ theme = "dark" }) {
     });
   };
 
+  const executeGeocode = async (e) => {
+    e.preventDefault();
+    if (!locationStr.trim()) {
+      setGeocodedRegion(null);
+      setLocationLabel("Global");
+      return;
+    }
+    setLoading(true);
+    try {
+      const g = await fetchGeocode(locationStr);
+      setGeocodedRegion(g.bounding_box);
+      setLocationLabel(g.display_name.split(",")[0]);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
 
     const compareWindows = async () => {
       setLoading(true);
       setError("");
+      setStoryOutput(null);
       try {
         const windowA = formatDateRange(rangeA.start, rangeA.end);
         const windowB = formatDateRange(rangeB.start, rangeB.end);
+
+        const payloadA = { start_date: windowA.start, end_date: windowA.end };
+        const payloadB = { start_date: windowB.start, end_date: windowB.end };
+
+        if (geocodedRegion) {
+          payloadA.region = geocodedRegion;
+          payloadB.region = geocodedRegion;
+        }
+
         const [first, second] = await Promise.all([
-          fetchClimateSlice(variable, { start_date: windowA.start, end_date: windowA.end }),
-          fetchClimateSlice(variable, { start_date: windowB.start, end_date: windowB.end }),
+          fetchClimateSlice(variable, payloadA),
+          fetchClimateSlice(variable, payloadB),
         ]);
         if (!cancelled) {
           setData({ first, second, windowA: { ...rangeA }, windowB: { ...rangeB } });
+          
+          setStoryLoading(true);
+          fetchStoryCompare({
+            variable,
+            location_a: `Window ${rangeA.start}-${rangeA.end} at ${locationLabel}`,
+            location_b: `Window ${rangeB.start}-${rangeB.end} at ${locationLabel}`,
+            stats_a: first.statistics || {},
+            stats_b: second.statistics || {},
+            time_series_a: first.time_series_preview || [],
+            time_series_b: second.time_series_preview || [],
+          }).then((res) => {
+            if(!cancelled) {
+               setStoryOutput(res);
+            }
+          }).finally(() => {
+            if(!cancelled) setStoryLoading(false);
+          });
         }
       } catch (err) {
         if (!cancelled) {
@@ -86,7 +153,7 @@ export default function ComparisonPage({ theme = "dark" }) {
     return () => {
       cancelled = true;
     };
-  }, [variable, rangeA.start, rangeA.end, rangeB.start, rangeB.end]);
+  }, [variable, rangeA.start, rangeA.end, rangeB.start, rangeB.end, geocodedRegion, locationLabel]);
 
   const buildChart = () => {
     if (!data) return null;
@@ -120,73 +187,102 @@ export default function ComparisonPage({ theme = "dark" }) {
   return (
     <div>
       <section className="panel">
-        <h2>Comparison Lab</h2>
+        <h2>Comparison Lab - {locationLabel}</h2>
         <p>Compare the same variable across two different time windows using your preferred visualization.</p>
-        <form className="comparison-form">
-          <label>
-            Variable
-            <select value={variable} onChange={(event) => setVariable(event.target.value)}>
+        
+        <form className="location-form" onSubmit={executeGeocode} style={{marginBottom: "1rem", display: "flex", gap: "0.5rem"}}>
+          <input 
+            type="text" 
+            placeholder="Enter location (e.g. Japan)..." 
+            value={locationStr} 
+            onChange={e => setLocationStr(e.target.value)} 
+            style={{flex: 1, padding: "0.5rem", borderRadius: "4px"}}
+          />
+          <button type="submit" style={{padding: "0.5rem 1rem", borderRadius: "4px", backgroundColor: "#4ad6ff", color: "#000", border: 'none'}}>Search Location</button>
+        </form>
+
+        <form className="comparison-form" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: "1rem" }}>
+          <div>
+            <label style={{ display: "block", marginBottom: "0.5rem" }}>Variable</label>
+            <select value={variable} onChange={(event) => setVariable(event.target.value)} style={{ padding: "0.5rem", borderRadius: "4px" }}>
               {variableOptions.map((opt) => (
                 <option key={opt.id} value={opt.id}>
                   {opt.label}
                 </option>
               ))}
             </select>
-          </label>
-          <label>
-            Start A
-            <input
-              type="number"
-              name="start"
-              min="1948"
-              max="2020"
-              value={rangeA.start}
-              onChange={handleInput(setRangeA)}
-            />
-          </label>
-          <label>
-            End A
-            <input
-              type="number"
-              name="end"
-              min={rangeA.start}
-              max="2025"
-              value={rangeA.end}
-              onChange={handleInput(setRangeA)}
-            />
-          </label>
-          <label>
-            Start B
-            <input
-              type="number"
-              name="start"
-              min="1948"
-              max="2020"
-              value={rangeB.start}
-              onChange={handleInput(setRangeB)}
-            />
-          </label>
-          <label>
-            End B
-            <input
-              type="number"
-              name="end"
-              min={rangeB.start}
-              max="2025"
-              value={rangeB.end}
-              onChange={handleInput(setRangeB)}
-            />
-          </label>
-          <label>
-            Graph Type
-            <select value={chartType} onChange={(event) => setChartType(event.target.value)}>
+          </div>
+
+          <div className="year-selector" style={{ maxWidth: '400px' }}>
+            <p>Window A</p>
+            <div className="range-display">
+              <div>
+                <span className="label">Start year</span>
+                <strong>{rangeA.start}</strong>
+              </div>
+              <div>
+                <span className="label">End year</span>
+                <strong>{rangeA.end}</strong>
+              </div>
+            </div>
+            <div className="dual-slider" style={rangeStyleA}>
+              <input
+                type="range"
+                min={YEAR_MIN}
+                max={YEAR_MAX}
+                value={rangeA.start}
+                onChange={(e) => setRangeA(p => ({ ...p, start: Math.min(Number(e.target.value), p.end) }))}
+              />
+              <input
+                type="range"
+                min={YEAR_MIN}
+                max={YEAR_MAX}
+                value={rangeA.end}
+                onChange={(e) => setRangeA(p => ({ ...p, end: Math.max(Number(e.target.value), p.start) }))}
+              />
+            </div>
+          </div>
+
+          <div className="year-selector" style={{ maxWidth: '400px' }}>
+            <p>Window B</p>
+            <div className="range-display">
+              <div>
+                <span className="label">Start year</span>
+                <strong>{rangeB.start}</strong>
+              </div>
+              <div>
+                <span className="label">End year</span>
+                <strong>{rangeB.end}</strong>
+              </div>
+            </div>
+            <div className="dual-slider" style={rangeStyleB}>
+              <input
+                type="range"
+                min={YEAR_MIN}
+                max={YEAR_MAX}
+                value={rangeB.start}
+                onChange={(e) => setRangeB(p => ({ ...p, start: Math.min(Number(e.target.value), p.end) }))}
+              />
+              <input
+                type="range"
+                min={YEAR_MIN}
+                max={YEAR_MAX}
+                value={rangeB.end}
+                onChange={(e) => setRangeB(p => ({ ...p, end: Math.max(Number(e.target.value), p.start) }))}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", marginBottom: "0.5rem" }}>Graph Type</label>
+            <select value={chartType} onChange={(event) => setChartType(event.target.value)} style={{ padding: "0.5rem", borderRadius: "4px" }}>
               {graphOptions.map((opt) => (
                 <option key={opt.id} value={opt.id}>
                   {opt.label}
                 </option>
               ))}
             </select>
-          </label>
+          </div>
           <small className="chip-hint">Charts refresh automatically.</small>
         </form>
         {error && <p className="error-text">{error}</p>}
@@ -194,6 +290,25 @@ export default function ComparisonPage({ theme = "dark" }) {
       </section>
 
       {data && <section className="panel chart-wrapper">{buildChart()}</section>}
+      {data && (
+        <section className="panel">
+          <h3>Agentic Insights ✨</h3>
+          {storyLoading ? (
+            <p>Generating insights...</p>
+          ) : storyOutput ? (
+            <div>
+              <p>{storyOutput.story}</p>
+              {storyOutput.risk_score && (
+                <div style={{ marginTop: "1rem", padding: "0.5rem", borderRadius: "8px", background: "rgba(248, 95, 115, 0.1)", border: "1px solid #f85f73" }}>
+                  <strong>Climate Risk Score:</strong> {storyOutput.risk_score} / 10
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="error-text">Failed to fetch insights.</p>
+          )}
+        </section>
+      )}
     </div>
   );
 }
@@ -220,6 +335,7 @@ function renderHeatmap(spatialGrid, title, plotTheme) {
       data={[
         {
           type: "heatmap",
+          zsmooth: "best",
           x: spatialGrid.lon,
           y: spatialGrid.lat,
           z: spatialGrid.values,
