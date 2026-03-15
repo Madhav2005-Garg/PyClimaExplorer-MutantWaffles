@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import VariableSection from "../components/VariableSection.jsx";
-import { fetchClimateSlice, formatDateRange } from "../api/client.js";
+import { fetchClimateSlice, formatDateRange, fetchStory } from "../api/client.js";
 
 const variableOptions = [
   { id: "temperature", label: "Temperature" },
@@ -20,6 +20,7 @@ export default function DashboardPage() {
     "--end": (((range.end - YEAR_MIN) / (YEAR_MAX - YEAR_MIN)) * 100).toFixed(1),
   };
   const [results, setResults] = useState({});
+  const [stories, setStories] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -36,6 +37,7 @@ export default function DashboardPage() {
       if (selected.length === 0) {
         setError("Select at least one variable.");
         setResults({});
+        setStories({});
         setLoading(false);
         return;
       }
@@ -53,6 +55,20 @@ export default function DashboardPage() {
           });
           if (cancelled) return;
           nextResults[variable] = data;
+
+          // Fetch story asynchronously without blocking the loop
+          fetchStory({
+             variable,
+             start_year: range.start,
+             end_year: range.end,
+             statistics: data.statistics || {},
+             time_series_preview: data.time_series_preview || []
+          }).then(res => {
+            if(!cancelled) {
+              setStories(prev => ({...prev, [variable]: res}));
+            }
+          });
+
         } catch (err) {
           if (!cancelled) {
             setError(err.message);
@@ -147,7 +163,7 @@ export default function DashboardPage() {
         {loading && <p className="info-text">Loading latest data...</p>}
         {selected.map((variable) =>
           results[variable] ? (
-            <VariableSection key={variable} variable={variable} data={results[variable]} />
+            <VariableSection key={variable} variable={variable} data={results[variable]} story={stories[variable]} />
           ) : null
         )}
       </div>

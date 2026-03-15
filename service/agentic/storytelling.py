@@ -15,7 +15,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field
 
-DEFAULT_MODEL = "gemini-1.5-flash"
+DEFAULT_MODEL = "gemini-2.0-flash"
 
 
 class StoryRequest(BaseModel):
@@ -26,11 +26,10 @@ class StoryRequest(BaseModel):
     start_year: int | None = Field(None, description="Start year of the data slice")
     end_year: int | None = Field(None, description="End year of the data slice")
     region_name: str | None = Field(None, description="Human-readable region name")
-    statistics: Dict[str, float] = Field(default_factory=dict, description="Basic stats like mean/max/min/std")
-    time_series_preview: List[Dict[str, float]] = Field(
+    statistics: Dict[str, float | None] = Field(default_factory=dict, description="Basic stats like mean/max/min/std")
+    time_series_preview: List[Dict[str, float | None | str]] = Field(
         default_factory=list, description="Yearly preview items: [{year: int, value: float}]"
     )
-
 
 class ComparisonRequest(BaseModel):
     """Inputs for two-location or two-slice comparison storytelling."""
@@ -40,10 +39,10 @@ class ComparisonRequest(BaseModel):
     location_b: str = Field(..., description="Label for second location")
     start_year: int | None = None
     end_year: int | None = None
-    stats_a: Dict[str, float] = Field(default_factory=dict)
-    stats_b: Dict[str, float] = Field(default_factory=dict)
-    time_series_a: List[Dict[str, float]] = Field(default_factory=list)
-    time_series_b: List[Dict[str, float]] = Field(default_factory=list)
+    stats_a: Dict[str, float | None] = Field(default_factory=dict)
+    stats_b: Dict[str, float | None] = Field(default_factory=dict)
+    time_series_a: List[Dict[str, float | None | str]] = Field(default_factory=list)
+    time_series_b: List[Dict[str, float | None | str]] = Field(default_factory=list)
 
 
 class _StoryState(TypedDict):
@@ -56,7 +55,7 @@ def _get_llm(model: str = DEFAULT_MODEL) -> ChatGoogleGenerativeAI:
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         raise RuntimeError("GOOGLE_API_KEY environment variable is required for Gemini access")
-    return ChatGoogleGenerativeAI(model=model, temperature=0.3, max_output_tokens=300)
+    return ChatGoogleGenerativeAI(model=model, temperature=0.3, max_output_tokens=300, api_key=api_key)
 
 
 def _build_story_prompt(request: StoryRequest) -> str:
@@ -74,6 +73,7 @@ def _build_story_prompt(request: StoryRequest) -> str:
             "Write 3-5 sentences that summarize the trend for the given variable.",
             "Stay factual, cite numbers where possible, avoid speculation.",
             "If data is sparse, state that uncertainty is high.",
+            "Also provide a climate risk score from 1 to 10 based on these metrics. Output ONLY valid JSON in format: {\"story\": \"...\", \"risk_score\": 8}",
             "",
             f"Variable: {request.variable}",
             f"Dataset: {request.dataset or '(unspecified)'}",
@@ -107,6 +107,7 @@ def _build_comparison_prompt(request: ComparisonRequest) -> str:
             "Compare the two locations in 3-5 sentences.",
             "Highlight differences, quantify where possible, and note any trends.",
             "Stay factual; if data is thin, mention uncertainty.",
+            "Also provide a combined climate risk score from 1 to 10 based on these metrics. Output ONLY valid JSON in format: {\"story\": \"...\", \"risk_score\": 8}",
             "",
             f"Variable: {request.variable}",
             f"Time range: {start} to {end}",
@@ -126,6 +127,8 @@ def _build_comparison_prompt(request: ComparisonRequest) -> str:
     )
 
 
+import json
+
 def _build_story_graph(model: str = DEFAULT_MODEL):
     parser = StrOutputParser()
 
@@ -133,6 +136,11 @@ def _build_story_graph(model: str = DEFAULT_MODEL):
         llm = _get_llm(model)
         content = llm.invoke(state["prompt"])
         text = parser.invoke(content)
+        # Try to parse JSON to ensure it's clean (optional, but good for removing backticks)
+        if text.startswith("```json"):
+            text = text.replace("```json", "").replace("```", "").strip()
+        elif text.startswith("```"):
+            text = text.replace("```", "").strip()
         return {"prompt": state["prompt"], "response": text}
 
     graph = StateGraph(_StoryState)

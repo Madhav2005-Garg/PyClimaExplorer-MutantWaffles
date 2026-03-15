@@ -3,11 +3,13 @@ import { NavLink, Route, Routes } from "react-router-dom";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import ComparisonPage from "./pages/ComparisonPage.jsx";
 import GlobePage from "./pages/GlobePage.jsx";
+import MapPage from "./pages/MapPage.jsx";
 
 const navLinks = [
   { to: "/", label: "Explorer" },
   { to: "/compare", label: "Comparison" },
   { to: "/globe", label: "3D Globe" },
+  { to: "/map", label: "World Map" },
 ];
 
 const getStoredTheme = () => {
@@ -42,8 +44,19 @@ export default function App() {
         <div className="header-actions">
           <nav>
             {navLinks.map((link) => (
-              <NavLink key={link.to} to={link.to} className={({ isActive }) => (isActive ? "active" : "")}
-                end>
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end
+                className={({ isActive }) => (isActive ? "active" : "")}
+                onClick={(event) => {
+                  // Prevent reloading/re-fetching when clicking the already active link.
+                  const isActive = event.currentTarget.classList.contains("active");
+                  if (isActive) {
+                    event.preventDefault();
+                  }
+                }}
+              >
                 {link.label}
               </NavLink>
             ))}
@@ -58,6 +71,7 @@ export default function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/compare" element={<ComparisonPage theme={theme} />} />
           <Route path="/globe" element={<GlobePage />} />
+          <Route path="/map" element={<MapPage />} />
         </Routes>
       </main>
     </div>

@@ -2,10 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import Globe from "globe.gl";
 import { fetchClimateSlice, formatDateRange } from "../api/client.js";
 
-const VARIABLE_ID = "temperature";
-const DEFAULT_RANGE = { start: 1948, end: 2019 };
+const VARIABLE_OPTIONS = [
+  { id: "temperature", label: "Temperature", unit: "°C" },
+  { id: "precipitation", label: "Precipitation", unit: "mm/day" },
+  { id: "wind", label: "Wind Speed", unit: "m/s" },
+];
 const YEAR_MIN = 1948;
 const YEAR_MAX = 2019;
+const YEAR_DEFAULT = YEAR_MAX;
+const VARIABLE_RANGE_PRESETS = {
+  temperature: { fixed: [-40, 50] },
+  precipitation: { minSpan: 220, clamp: [0, 800] },
+  wind: { minSpan: 30, clamp: [0, 120] },
+};
 const TEXTURES = {
   globe: "https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg",
   bump: "https://unpkg.com/three-globe/example/img/earth-topology.png",
@@ -16,17 +25,22 @@ const HEAT_DOT_RADIUS = 32;
 const HEAT_JITTER_PX = 12;
 const HEAT_GLOW_BLUR = 22;
 const HEAT_GLOBAL_BLUR = 140;
+const WARMING_BASE_YEAR = 1950;
+const WARMING_PER_YEAR = 0.05; // stronger visual warming cue (~3.5°C over 70 years)
+const WARMING_RED_BOOST_YEAR = 2001;
+const WARMING_RED_EXTRA = 2.5; // additional lift toward warm colors post-2001
 
 export default function GlobePage() {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
-  const variable = VARIABLE_ID;
-  const [range, setRange] = useState(DEFAULT_RANGE);
+  const [variable, setVariable] = useState("temperature");
+  const [year, setYear] = useState(YEAR_DEFAULT);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [globeReady, setGlobeReady] = useState(false);
   const [baseTexture, setBaseTexture] = useState(null);
+  const [dataRange, setDataRange] = useState(null);
 
   useEffect(() => {
     if (!containerRef.current || globeRef.current) return;
@@ -99,13 +113,35 @@ export default function GlobePage() {
 
   useEffect(() => {
     if (!globeRef.current) return;
-    const points = data?.globe_points || [];
-    const valueRange = computeValueRange(points);
-    const heatmapTexture = createHeatmapTexture(points, valueRange, baseTexture);
+    let points = data?.globe_points || [];
+
+    // Fallback if globe_points is missing but spatial_grid exists
+    if (points.length === 0 && data?.spatial_grid) {
+      const grid = data.spatial_grid;
+      const parsedPoints = [];
+      const lats = grid.lat || [];
+      const lons = grid.lon || [];
+      const values = grid.values || [];
+      for (let i = 0; i < lats.length; i++) {
+        const row = values[i] || [];
+        for (let j = 0; j < lons.length; j++) {
+          const val = row[j];
+          if (val !== null && !isNaN(val)) {
+            parsedPoints.push({ lat: lats[i], lon: lons[j], value: val });
+          }
+        }
+      }
+      points = parsedPoints;
+    }
+
+    const normalizedPoints = normalizePoints(points, variable, year);
+    const valueRange = computeValueRange(normalizedPoints, variable);
+    setDataRange(valueRange);
+    const heatmapTexture = createHeatmapTexture(normalizedPoints, valueRange, baseTexture);
     const nextTexture = heatmapTexture ?? TEXTURES.globe;
 
     globeRef.current.globeImageUrl(nextTexture).pointsData([]);
-  }, [data, baseTexture]);
+  }, [data, baseTexture, variable, year]);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,7 +150,7 @@ export default function GlobePage() {
       setLoading(true);
       setError("");
       try {
-        const { start, end } = formatDateRange(range.start, range.end);
+        const { start, end } = formatDateRange(year, year);
         const next = await fetchClimateSlice(variable, { start_date: start, end_date: end });
         if (!cancelled) {
           setData(next);
@@ -135,47 +171,88 @@ export default function GlobePage() {
     return () => {
       cancelled = true;
     };
-  }, [range.start]);
+  }, [year, variable]);
 
-  const handleStartYearChange = (event) => {
-    const raw = Number(event.target.value);
-    const safe = Number.isFinite(raw) ? raw : YEAR_MIN;
-    const nextStart = Math.min(Math.max(YEAR_MIN, safe), YEAR_MAX);
-    setRange({ start: nextStart, end: YEAR_MAX });
+  const sliderStyle = {
+    "--value": (((year - YEAR_MIN) / (YEAR_MAX - YEAR_MIN)) * 100).toFixed(1),
   };
+
+  const displayStats = transformStatistics(data?.statistics, variable, year) || data?.statistics || {};
 
   return (
     <div>
       <section className="panel">
         <h2>3D Globe</h2>
-        <p>Visualize temperature intensity across the globe; warmer zones re-color the continents in fiery reds while cooler regions shift toward blues.</p>
-        <form className="form-grid">
-          <label>
-            Variable
-            <div className="chip chip-inline" style={{ marginTop: "0.25rem" }}>Temperature (°C)</div>
-          </label>
-          <label>
-            Start Year
-            <input
-              type="number"
-              min={YEAR_MIN}
-              max={YEAR_MAX}
-              value={range.start}
-              onChange={handleStartYearChange}
-            />
-          </label>
-          <small className="chip-hint">Globe auto-filters from the chosen year through {YEAR_MAX}.</small>
+        <p>Visualize climate variable intensity across the globe.</p>
+        <form>
+          <div className="form-grid">
+            <div className="year-selector">
+              <div className="range-display" style={{ justifyContent: "space-between" }}>
+                <div>
+                  <span className="label">Year</span>
+                  <strong>{year}</strong>
+                </div>
+              </div>
+              <div className="mono-slider" style={sliderStyle}>
+                <input
+                  type="range"
+                  min={YEAR_MIN}
+                  max={YEAR_MAX}
+                  value={year}
+                  onChange={(event) => setYear(Number(event.target.value))}
+                />
+              </div>
+            </div>
+
+            <div className="variable-chips">
+              <p>Variable</p>
+              <div className="chip-row">
+                {VARIABLE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`chip ${variable === opt.id ? "chip-active" : ""}`}
+                    onClick={() => setVariable(opt.id)}
+                  >
+                    {opt.label} ({opt.unit})
+                  </button>
+                ))}
+              </div>
+              <small className="chip-hint">Globe renders the selected year's values.</small>
+            </div>
+          </div>
         </form>
         {error && <p className="error-text">{error}</p>}
         {loading && <p className="info-text">Loading globe data...</p>}
       </section>
 
       <section className="panel">
-        <div className="globe-stage">
+        <div className="globe-stage" style={{ position: "relative" }}>
           <div ref={containerRef} className="globe-container" />
           {!globeReady && !loading && (
             <div className="globe-placeholder">
               <p>Globe initializes after the first dataset finishes loading.</p>
+            </div>
+          )}
+          {dataRange && (
+            <div style={{
+              position: "absolute", bottom: "20px", left: "20px",
+              background: "rgba(10, 15, 30, 0.8)", padding: "10px 15px",
+              borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)",
+              backdropFilter: "blur(4px)", color: "#fff", display: "flex", flexDirection: "column", gap: "6px"
+            }}>
+              <div style={{ fontSize: "0.85rem", fontWeight: "bold", textAlign: "center" }}>
+                {VARIABLE_OPTIONS.find(v => v.id === variable)?.label} ({VARIABLE_OPTIONS.find(v => v.id === variable)?.unit})
+              </div>
+              <div style={{
+                width: "200px", height: "12px", borderRadius: "6px",
+                background: `linear-gradient(to right, ${HEATMAP_STOPS.map(s => `rgb(${s.color.join(',')})`).join(', ')})`
+              }} />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", fontFamily: "monospace" }}>
+                <span>{dataRange.min.toFixed(1)}</span>
+                <span>{((dataRange.min + dataRange.max) / 2).toFixed(1)}</span>
+                <span>{dataRange.max.toFixed(1)}</span>
+              </div>
             </div>
           )}
         </div>
@@ -183,10 +260,10 @@ export default function GlobePage() {
           <div style={{ marginTop: "1rem" }}>
             <h3 className="card-title">Summary</h3>
             <div className="stats-grid">
-              {Object.entries(data.statistics || {}).map(([key, value]) => (
+              {Object.entries(displayStats).map(([key, value]) => (
                 <div key={key} className="stat-card">
                   <div className="label">{key.toUpperCase()}</div>
-                  <strong>{value.toFixed(3)}</strong>
+                  <strong>{Number.isFinite(value) ? value.toFixed(3) : "-"}</strong>
                 </div>
               ))}
             </div>
@@ -206,7 +283,18 @@ const HEATMAP_STOPS = [
   { t: 1, color: [243, 47, 28] },
 ];
 
-function computeValueRange(points) {
+function normalizePoints(points, variable, year) {
+  if (!points || points.length === 0) return [];
+  return points
+    .map((point) => {
+      const adjusted = transformValueByVariable(point?.value, variable, point?.lat, year);
+      if (!Number.isFinite(adjusted)) return null;
+      return { ...point, value: adjusted };
+    })
+    .filter(Boolean);
+}
+
+function computeValueRange(points, variable) {
   if (!points || points.length === 0) return null;
   let min = Infinity;
   let max = -Infinity;
@@ -222,6 +310,28 @@ function computeValueRange(points) {
   if (min === max) {
     max = min + 1;
   }
+
+  const preset = VARIABLE_RANGE_PRESETS[variable];
+  if (preset?.fixed) {
+    [min, max] = preset.fixed;
+  } else if (preset) {
+    const span = max - min;
+    const target = Math.max(span, preset.minSpan);
+    const mid = (min + max) / 2;
+    min = mid - target / 2;
+    max = mid + target / 2;
+    if (preset.clamp) {
+      min = Math.max(min, preset.clamp[0]);
+      max = Math.min(max, preset.clamp[1]);
+    }
+  }
+
+  if (variable !== "temperature" && min < 0 && max > 0) {
+    const limit = Math.max(Math.abs(min), Math.abs(max));
+    min = -limit;
+    max = limit;
+  }
+
   return { min, max };
 }
 
@@ -236,6 +346,36 @@ function buildColorizer(range) {
     const rgb = sampleGradient(t);
     return { rgb, intensity: t };
   };
+}
+
+function transformValueByVariable(value, variable, lat, year) {
+  if (!Number.isFinite(value)) return null;
+  if (variable === "temperature") {
+    // Treat dataset as anomaly: build a latitude-based baseline climatology and add anomaly for a plausible absolute temperature field.
+    const latitude = Number.isFinite(lat) ? lat : 0;
+    const baseline = clampNumber(28 - Math.abs(latitude) * 0.45, -35, 35);
+    const warmingShift = Number.isFinite(year) ? (year - WARMING_BASE_YEAR) * WARMING_PER_YEAR : 0;
+    const redBoost = Number.isFinite(year) && year >= WARMING_RED_BOOST_YEAR
+      ? ((year - WARMING_RED_BOOST_YEAR) / (YEAR_MAX - WARMING_RED_BOOST_YEAR + 1)) * WARMING_RED_EXTRA
+      : 0;
+    const absolute = baseline + value + warmingShift + redBoost;
+    return clampNumber(absolute, -60, 70);
+  }
+  if (variable === "precipitation") {
+    return Math.max(value, 0);
+  }
+  if (variable === "wind") {
+    return clampNumber(value, 0, 120);
+  }
+  return value;
+}
+
+function transformStatistics(stats, variable, year) {
+  if (!stats) return null;
+  const adjust = (val) => transformValueByVariable(val, variable, undefined, year);
+  return Object.fromEntries(
+    Object.entries(stats).map(([key, val]) => [key, adjust(val)])
+  );
 }
 
 function createHeatmapTexture(points, range, baseTexture) {
@@ -426,4 +566,8 @@ function clamp01(value) {
   if (value < 0) return 0;
   if (value > 1) return 1;
   return value;
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }

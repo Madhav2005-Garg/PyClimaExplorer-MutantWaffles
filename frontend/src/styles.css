@@ -1,65 +1,61 @@
 :root {
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --accent: #4ad6ff;
-  --accent-2: #f85f73;
-  --bg-base: #07060f;
-  --body-bg: radial-gradient(circle at top, rgba(74, 214, 255, 0.25), transparent 60%),
-    radial-gradient(circle at bottom, rgba(248, 95, 115, 0.2), transparent 55%),
-    #05030a;
-  --text-primary: #f0f4ff;
-  --text-muted: #b1b6d8;
-  --nav-link: #b7c4ff;
-  --nav-hover-bg: rgba(74, 214, 255, 0.15);
+  --accent-2: #ff9fb3;
+  --bg-base: #0b1220;
+  --body-bg: #0b1220;
+  --text-primary: #eef3ff;
+  --text-muted: #9fb0cc;
+  --nav-link: #c5d5ff;
+  --nav-hover-bg: rgba(93, 224, 255, 0.15);
   --nav-hover-color: #ffffff;
-  --panel-bg: rgba(17, 20, 35, 0.85);
-  --panel-border: rgba(255, 255, 255, 0.06);
-  --header-bg: rgba(6, 9, 20, 0.7);
-  --input-bg: rgba(9, 13, 25, 0.9);
-  --input-border: rgba(255, 255, 255, 0.15);
-  --chip-bg: rgba(15, 18, 32, 0.9);
-  --chip-border: rgba(255, 255, 255, 0.2);
-  --chart-bg: rgba(5, 7, 15, 0.9);
-  --chart-border: rgba(255, 255, 255, 0.08);
-  --globe-bg: rgba(5, 7, 15, 0.9);
-  --placeholder-bg: rgba(5, 7, 15, 0.85);
-  --placeholder-border: rgba(255, 255, 255, 0.15);
-  --stat-bg: rgba(12, 15, 26, 0.9);
-  --stat-border: rgba(255, 255, 255, 0.09);
+  --panel-bg: #0f1729;
+  --panel-border: rgba(255, 255, 255, 0.05);
+  --header-bg: rgba(11, 18, 32, 0.9);
+  --input-bg: #111b30;
+  --input-border: rgba(255, 255, 255, 0.08);
+  --chip-bg: #111b30;
+  --chip-border: rgba(255, 255, 255, 0.12);
+  --chart-bg: #0f182c;
+  --chart-border: rgba(255, 255, 255, 0.07);
+  --globe-bg: #0f182c;
+  --placeholder-bg: #0f182c;
+  --placeholder-border: rgba(255, 255, 255, 0.1);
+  --stat-bg: #111c31;
+  --stat-border: rgba(255, 255, 255, 0.08);
   --card-bg: var(--panel-bg);
-  --error-color: #ff9393;
-  --info-color: #8ed8ff;
+  --error-color: #ff9aa2;
+  --info-color: #7dd6ff;
   --plot-text: #f7f9ff;
   --plot-grid: rgba(255, 255, 255, 0.08);
 }
 
 :root[data-theme="light"] {
-  --bg-base: #f6f7fb;
-  --body-bg: radial-gradient(circle at top, rgba(74, 214, 255, 0.2), transparent 58%),
-    radial-gradient(circle at bottom, rgba(248, 95, 115, 0.18), transparent 55%),
-    #f6f7fb;
-  --text-primary: #111323;
-  --text-muted: #4c5166;
-  --nav-link: #444867;
+  --bg-base: #f4f6fb;
+  --body-bg: #f4f6fb;
+  --text-primary: #0f162d;
+  --text-muted: #4b5670;
+  --nav-link: #2f3c63;
   --nav-hover-bg: rgba(74, 214, 255, 0.2);
-  --nav-hover-color: #101428;
-  --panel-bg: rgba(255, 255, 255, 0.95);
+  --nav-hover-color: #0f162d;
+  --panel-bg: #ffffff;
   --panel-border: rgba(15, 20, 46, 0.08);
-  --header-bg: rgba(255, 255, 255, 0.85);
-  --input-bg: rgba(245, 247, 255, 0.95);
-  --input-border: rgba(15, 20, 46, 0.2);
-  --chip-bg: rgba(245, 247, 255, 0.95);
-  --chip-border: rgba(15, 20, 46, 0.12);
-  --chart-bg: rgba(255, 255, 255, 0.98);
+  --header-bg: rgba(255, 255, 255, 0.95);
+  --input-bg: #f6f8ff;
+  --input-border: rgba(27, 36, 74, 0.14);
+  --chip-bg: #f6f8ff;
+  --chip-border: rgba(27, 36, 74, 0.16);
+  --chart-bg: #ffffff;
   --chart-border: rgba(15, 20, 46, 0.08);
-  --globe-bg: rgba(244, 246, 255, 0.95);
-  --placeholder-bg: rgba(244, 246, 255, 0.92);
-  --placeholder-border: rgba(15, 20, 46, 0.2);
-  --stat-bg: rgba(244, 246, 255, 0.95);
-  --stat-border: rgba(15, 20, 46, 0.12);
-  --error-color: #c62828;
-  --info-color: #1f6fe5;
-  --plot-text: #1f2337;
-  --plot-grid: rgba(27, 32, 57, 0.18);
+  --globe-bg: #ffffff;
+  --placeholder-bg: #ffffff;
+  --placeholder-border: rgba(27, 36, 74, 0.14);
+  --stat-bg: #f7f9ff;
+  --stat-border: rgba(27, 36, 74, 0.12);
+  --error-color: #c0392b;
+  --info-color: #1f7be5;
+  --plot-text: #1c2340;
+  --plot-grid: rgba(27, 32, 57, 0.16);
 }
 
 * {
@@ -73,6 +69,7 @@ body {
   min-height: 100vh;
   color: var(--text-primary);
   transition: background 0.3s ease, color 0.3s ease;
+  letter-spacing: 0.01em;
 }
 
 .app-shell {
@@ -90,6 +87,7 @@ body {
   background: var(--header-bg);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--panel-border);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
 }
 
 .app-header h1 {
@@ -109,6 +107,7 @@ nav a {
   padding: 0.4rem 0.8rem;
   border-radius: 999px;
   transition: background 0.2s ease, color 0.2s ease;
+  font-weight: 600;
 }
 
 nav a.active,
@@ -134,7 +133,8 @@ main {
   border-radius: 1.2rem;
   padding: 1.5rem;
   margin-bottom: 2rem;
-  box-shadow: 0 20px 35px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
 }
 
 .panel h2 {
@@ -165,17 +165,23 @@ main {
 
 .dual-slider {
   position: relative;
-  padding: 0 0.4rem;
-  height: 36px;
+  padding: 0 0.75rem;
+  height: 42px;
+}
+
+.mono-slider {
+  position: relative;
+  padding: 0 0.75rem;
+  height: 42px;
 }
 
 .dual-slider::after,
 .dual-slider::before {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
-  height: 4px;
+  left: 10px;
+  right: 10px;
+  height: 6px;
   border-radius: 999px;
   top: 50%;
   transform: translateY(-50%);
@@ -185,22 +191,46 @@ main {
   background: rgba(255, 255, 255, 0.18);
 }
 
+.mono-slider::before,
+.dual-slider::after {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.mono-slider::before,
+  right: 0;
+  height: 4px;
+  border-radius: 999px;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+
+.mono-slider::before {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+
+.mono-slider::after {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  width: calc((var(--value) * 1%));
+  right: auto;
+}
+
 .dual-slider::before {
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  left: calc(var(--start) * 1%);
+  left: calc(10px + var(--start) * 1%);
   right: auto;
   width: calc((var(--end) - var(--start)) * 1%);
 }
 
 .dual-slider input[type="range"] {
   position: absolute;
-  left: 0;
+  left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  width: 100%;
+  width: calc(100% - 20px);
   -webkit-appearance: none;
   appearance: none;
-  height: 4px;
+  height: 6px;
   background: transparent;
   border-radius: 999px;
   outline: none;
@@ -217,14 +247,15 @@ main {
 
 .dual-slider input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--accent);
   cursor: pointer;
   border: 2px solid var(--bg-base);
   pointer-events: auto;
   margin-top: 0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
 }
 
 .dual-slider input[type="range"]:last-child::-webkit-slider-thumb {
@@ -232,17 +263,55 @@ main {
 }
 
 .dual-slider input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--accent);
   border: 2px solid var(--bg-base);
   cursor: pointer;
   pointer-events: auto;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
 }
 
 .dual-slider input[type="range"]:last-child::-moz-range-thumb {
   background: var(--accent-2);
+}
+
+.mono-slider input[type="range"] {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: calc(100% - 20px);
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: transparent;
+  border-radius: 999px;
+  outline: none;
+  pointer-events: auto;
+}
+
+.mono-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(120deg, var(--accent), var(--accent-2));
+  cursor: pointer;
+  border: 2px solid var(--bg-base);
+  margin-top: 0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+
+.mono-slider input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(120deg, var(--accent), var(--accent-2));
+  border: 2px solid var(--bg-base);
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
 }
 
 .variable-chips {
@@ -316,6 +385,106 @@ label {
   padding-inline: 2.4rem;
 }
 
+.location-form {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.location-form input {
+  flex: 1;
+  min-width: 260px;
+}
+
+.location-form button {
+  background: linear-gradient(120deg, var(--accent), var(--accent-2));
+  color: #000;
+}
+
+.comparison-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1rem;
+  align-items: start;
+  margin-top: 1rem;
+}
+
+.comparison-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.comparison-column.wide {
+  gap: 1.2rem;
+}
+
+.control-card,
+.window-card {
+  background: var(--chart-bg);
+  border: 1px solid var(--chart-border);
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+}
+
+.window-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.window-header span {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 900px) {
+  .comparison-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.map-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.map-container {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+  min-height: 60vh;
+}
+
+.leaflet-host {
+  height: 60vh;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid var(--chart-border);
+}
+
+.map-sidebar {
+  background: var(--chart-bg);
+  border: 1px solid var(--chart-border);
+  border-radius: 1rem;
+  padding: 1rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+@media (max-width: 1000px) {
+  .map-container {
+    grid-template-columns: 1fr;
+  }
+}
+
 input,
 select {
   border-radius: 0.6rem;
@@ -324,6 +493,7 @@ select {
   color: var(--text-primary);
   padding: 0.6rem 0.8rem;
   font-size: 1rem;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
 }
 
 button {
@@ -336,6 +506,7 @@ button {
   cursor: pointer;
   min-height: 44px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
 }
 
 button.chip {
@@ -386,6 +557,7 @@ button:hover {
   border-radius: 1rem;
   padding: 1rem;
   border: 1px solid var(--chart-border);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28);
 }
 
 .chart-row {
@@ -454,6 +626,7 @@ button:hover {
   border-radius: 0.8rem;
   border: 1px solid var(--stat-border);
   background: var(--stat-bg);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
 }
 
 @media (max-width: 720px) {

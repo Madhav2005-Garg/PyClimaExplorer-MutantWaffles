@@ -26,6 +26,39 @@ export async function fetchClimateSlice(variable, payload) {
   return response.json();
 }
 
+export async function fetchGeocode(query) {
+  const response = await fetch(`${API_BASE}/api/geocode`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || "Failed to fetch geocode");
+  }
+  return response.json();
+}
+
+export async function fetchStory(payload) {
+  const response = await fetch(`${API_BASE}/api/story`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) return { story: "Error generating insight." };
+  return response.json();
+}
+
+export async function fetchStoryCompare(payload) {
+  const response = await fetch(`${API_BASE}/api/story/compare`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) return { story: "Error generating insight." };
+  return response.json();
+}
+
 export function formatDateRange(yearStart, yearEnd) {
   const start = `${yearStart}-01-01`;
   const end = `${yearEnd}-12-31`;
