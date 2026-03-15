@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 from datetime import datetime
 from typing import Optional
 from dotenv import load_dotenv
@@ -12,8 +14,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from geopy.geocoders import Nominatim
+from google import genai
 
-from service.agentic.storytelling import ComparisonRequest, StoryRequest, generate_comparison, generate_story
+from service.agentic.storytelling import ComparisonRequest, StoryRequest
 from service.dataProcessing.precipitation import DEFAULT_END as PRECIP_END
 from service.dataProcessing.precipitation import DEFAULT_START as PRECIP_START
 from service.dataProcessing.precipitation import RegionBounds as PrecipRegion
@@ -123,12 +126,76 @@ def wind(query: DataQuery) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-import json
+def _get_gemini_client() -> genai.Client:
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY or GOOGLE_API_KEY is required for Gemini access")
+    return genai.Client(api_key=api_key)
+
+
+def _call_gemini(prompt: str, model: str = "gemini-2.0-flash-lite") -> str:
+    client = _get_gemini_client()
+    resp = client.models.generate_content(model=model, contents=prompt)
+    return resp.text or ""
+
+
+def _build_story_prompt(request: StoryRequest) -> str:
+    stats_lines = [f"- {k}: {v}" for k, v in (request.statistics or {}).items()] or ["- (no stats provided)"]
+    preview_lines = [f"- {item.get('year')}: {item.get('value')}" for item in (request.time_series_preview or [])] or [
+        "- (no time-series preview provided)"
+    ]
+    region = request.region_name or "the selected region"
+    start = request.start_year or "(unknown)"
+    end = request.end_year or "(unknown)"
+    return "\n".join(
+        [
+            "You are a concise climate analyst. Output ONLY JSON: {\"story\": str, \"risk_score\": int, \"trend\": str, \"events\": [str]}",
+            f"Variable: {request.variable}",
+            f"Dataset: {request.dataset or '(unspecified)'}",
+            f"Region: {region}",
+            f"Time range: {start} to {end}",
+            "Statistics:",
+            *stats_lines,
+            "Time series preview (year:value):",
+            *preview_lines,
+            "Constraints: keep story 3-5 sentences, trend one short phrase, events list up to 3 items, risk_score 1-10.",
+        ]
+    )
+
+
+def _build_comparison_prompt(request: ComparisonRequest) -> str:
+    stats_a = [f"- {k}: {v}" for k, v in (request.stats_a or {}).items()] or ["- (no stats for A)"]
+    stats_b = [f"- {k}: {v}" for k, v in (request.stats_b or {}).items()] or ["- (no stats for B)"]
+    preview_a = [f"- {item.get('year')}: {item.get('value')}" for item in (request.time_series_a or [])] or ["- (no series A)"]
+    preview_b = [f"- {item.get('year')}: {item.get('value')}" for item in (request.time_series_b or [])] or ["- (no series B)"]
+    start = request.start_year or "(unknown)"
+    end = request.end_year or "(unknown)"
+    return "\n".join(
+        [
+            "You are a concise climate analyst. Output ONLY JSON: {\"story\": str, \"risk_score\": int, \"trend\": str, \"events\": [str]}",
+            f"Variable: {request.variable}",
+            f"Time range: {start} to {end}",
+            "Location A:",
+            f"- Name: {request.location_a}",
+            "- Stats:",
+            *stats_a,
+            "- Time series preview:",
+            *preview_a,
+            "Location B:",
+            f"- Name: {request.location_b}",
+            "- Stats:",
+            *stats_b,
+            "- Time series preview:",
+            *preview_b,
+            "Constraints: keep story 3-5 sentences, trend one short phrase, events list up to 3 items, risk_score 1-10.",
+        ]
+    )
 
 @app.post("/api/story")
 def story(request: StoryRequest) -> dict:
     try:
-        text = generate_story(request)
+        prompt = _build_story_prompt(request)
+        text = _call_gemini(prompt)
         try:
             parsed = json.loads(text)
             return parsed
@@ -143,7 +210,8 @@ def story(request: StoryRequest) -> dict:
 @app.post("/api/story/compare")
 def story_compare(request: ComparisonRequest) -> dict:
     try:
-        text = generate_comparison(request)
+        prompt = _build_comparison_prompt(request)
+        text = _call_gemini(prompt)
         try:
             parsed = json.loads(text)
             return parsed
