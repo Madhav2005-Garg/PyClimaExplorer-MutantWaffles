@@ -133,7 +133,7 @@ def _get_gemini_client() -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
-def _call_gemini(prompt: str, model: str = "gemini-2.0-flash-lite") -> str:
+def _call_gemini(prompt: str, model: str = "gemini-1.5-flash") -> str:
     client = _get_gemini_client()
     resp = client.models.generate_content(model=model, contents=prompt)
     return resp.text or ""
