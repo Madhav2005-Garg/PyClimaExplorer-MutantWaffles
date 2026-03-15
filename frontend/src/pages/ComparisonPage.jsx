@@ -189,102 +189,111 @@ export default function ComparisonPage({ theme = "dark" }) {
       <section className="panel">
         <h2>Comparison Lab - {locationLabel}</h2>
         <p>Compare the same variable across two different time windows using your preferred visualization.</p>
-        
-        <form className="location-form" onSubmit={executeGeocode} style={{marginBottom: "1rem", display: "flex", gap: "0.5rem"}}>
-          <input 
-            type="text" 
-            placeholder="Enter location (e.g. Japan)..." 
-            value={locationStr} 
-            onChange={e => setLocationStr(e.target.value)} 
-            style={{flex: 1, padding: "0.5rem", borderRadius: "4px"}}
+        <form className="location-form" onSubmit={executeGeocode}>
+          <input
+            type="text"
+            placeholder="Enter location (e.g. Japan)..."
+            value={locationStr}
+            onChange={(e) => setLocationStr(e.target.value)}
           />
-          <button type="submit" style={{padding: "0.5rem 1rem", borderRadius: "4px", backgroundColor: "#4ad6ff", color: "#000", border: 'none'}}>Search Location</button>
+          <button type="submit">Search Location</button>
         </form>
 
-        <form className="comparison-form" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: "1rem" }}>
-          <div>
-            <label style={{ display: "block", marginBottom: "0.5rem" }}>Variable</label>
-            <select value={variable} onChange={(event) => setVariable(event.target.value)} style={{ padding: "0.5rem", borderRadius: "4px" }}>
-              {variableOptions.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="year-selector" style={{ maxWidth: '400px' }}>
-            <p>Window A</p>
-            <div className="range-display">
-              <div>
-                <span className="label">Start year</span>
-                <strong>{rangeA.start}</strong>
-              </div>
-              <div>
-                <span className="label">End year</span>
-                <strong>{rangeA.end}</strong>
-              </div>
+        <div className="comparison-layout">
+          <div className="comparison-column">
+            <div className="control-card">
+              <label>Variable</label>
+              <select value={variable} onChange={(event) => setVariable(event.target.value)}>
+                {variableOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="dual-slider" style={rangeStyleA}>
-              <input
-                type="range"
-                min={YEAR_MIN}
-                max={YEAR_MAX}
-                value={rangeA.start}
-                onChange={(e) => setRangeA(p => ({ ...p, start: Math.min(Number(e.target.value), p.end) }))}
-              />
-              <input
-                type="range"
-                min={YEAR_MIN}
-                max={YEAR_MAX}
-                value={rangeA.end}
-                onChange={(e) => setRangeA(p => ({ ...p, end: Math.max(Number(e.target.value), p.start) }))}
-              />
+
+            <div className="control-card">
+              <label>Graph Type</label>
+              <select value={chartType} onChange={(event) => setChartType(event.target.value)}>
+                {graphOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <small className="chip-hint">Charts refresh automatically.</small>
             </div>
           </div>
 
-          <div className="year-selector" style={{ maxWidth: '400px' }}>
-            <p>Window B</p>
-            <div className="range-display">
-              <div>
-                <span className="label">Start year</span>
-                <strong>{rangeB.start}</strong>
+          <div className="comparison-column wide">
+            <div className="window-card">
+              <div className="window-header">
+                <p>Window A</p>
+                <span>{rangeA.start} – {rangeA.end}</span>
               </div>
-              <div>
-                <span className="label">End year</span>
-                <strong>{rangeB.end}</strong>
+              <div className="range-display">
+                <div>
+                  <span className="label">Start year</span>
+                  <strong>{rangeA.start}</strong>
+                </div>
+                <div>
+                  <span className="label">End year</span>
+                  <strong>{rangeA.end}</strong>
+                </div>
+              </div>
+              <div className="dual-slider" style={rangeStyleA}>
+                <input
+                  type="range"
+                  min={YEAR_MIN}
+                  max={YEAR_MAX}
+                  value={rangeA.start}
+                  onChange={(e) => setRangeA((p) => ({ ...p, start: Math.min(Number(e.target.value), p.end) }))}
+                />
+                <input
+                  type="range"
+                  min={YEAR_MIN}
+                  max={YEAR_MAX}
+                  value={rangeA.end}
+                  onChange={(e) => setRangeA((p) => ({ ...p, end: Math.max(Number(e.target.value), p.start) }))}
+                />
               </div>
             </div>
-            <div className="dual-slider" style={rangeStyleB}>
-              <input
-                type="range"
-                min={YEAR_MIN}
-                max={YEAR_MAX}
-                value={rangeB.start}
-                onChange={(e) => setRangeB(p => ({ ...p, start: Math.min(Number(e.target.value), p.end) }))}
-              />
-              <input
-                type="range"
-                min={YEAR_MIN}
-                max={YEAR_MAX}
-                value={rangeB.end}
-                onChange={(e) => setRangeB(p => ({ ...p, end: Math.max(Number(e.target.value), p.start) }))}
-              />
-            </div>
-          </div>
 
-          <div>
-            <label style={{ display: "block", marginBottom: "0.5rem" }}>Graph Type</label>
-            <select value={chartType} onChange={(event) => setChartType(event.target.value)} style={{ padding: "0.5rem", borderRadius: "4px" }}>
-              {graphOptions.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+            <div className="window-card">
+              <div className="window-header">
+                <p>Window B</p>
+                <span>{rangeB.start} – {rangeB.end}</span>
+              </div>
+              <div className="range-display">
+                <div>
+                  <span className="label">Start year</span>
+                  <strong>{rangeB.start}</strong>
+                </div>
+                <div>
+                  <span className="label">End year</span>
+                  <strong>{rangeB.end}</strong>
+                </div>
+              </div>
+              <div className="dual-slider" style={rangeStyleB}>
+                <input
+                  type="range"
+                  min={YEAR_MIN}
+                  max={YEAR_MAX}
+                  value={rangeB.start}
+                  onChange={(e) => setRangeB((p) => ({ ...p, start: Math.min(Number(e.target.value), p.end) }))}
+                />
+                <input
+                  type="range"
+                  min={YEAR_MIN}
+                  max={YEAR_MAX}
+                  value={rangeB.end}
+                  onChange={(e) => setRangeB((p) => ({ ...p, end: Math.max(Number(e.target.value), p.start) }))}
+                />
+              </div>
+            </div>
           </div>
-          <small className="chip-hint">Charts refresh automatically.</small>
-        </form>
+        </div>
+
         {error && <p className="error-text">{error}</p>}
         {loading && <p className="info-text">Updating comparison...</p>}
       </section>

@@ -11,6 +11,7 @@ const YEAR_MIN = 1948;
 const YEAR_MAX = 2019;
 const YEAR_DEFAULT = YEAR_MAX;
 const VARIABLE_RANGE_PRESETS = {
+  temperature: { fixed: [-40, 50] },
   precipitation: { minSpan: 220, clamp: [0, 800] },
   wind: { minSpan: 30, clamp: [0, 120] },
 };
@@ -24,6 +25,10 @@ const HEAT_DOT_RADIUS = 32;
 const HEAT_JITTER_PX = 12;
 const HEAT_GLOW_BLUR = 22;
 const HEAT_GLOBAL_BLUR = 140;
+const WARMING_BASE_YEAR = 1950;
+const WARMING_PER_YEAR = 0.05; // stronger visual warming cue (~3.5°C over 70 years)
+const WARMING_RED_BOOST_YEAR = 2001;
+const WARMING_RED_EXTRA = 2.5; // additional lift toward warm colors post-2001
 
 export default function GlobePage() {
   const containerRef = useRef(null);
@@ -129,14 +134,14 @@ export default function GlobePage() {
       points = parsedPoints;
     }
 
-    const normalizedPoints = normalizePoints(points, variable);
+    const normalizedPoints = normalizePoints(points, variable, year);
     const valueRange = computeValueRange(normalizedPoints, variable);
     setDataRange(valueRange);
     const heatmapTexture = createHeatmapTexture(normalizedPoints, valueRange, baseTexture);
     const nextTexture = heatmapTexture ?? TEXTURES.globe;
 
     globeRef.current.globeImageUrl(nextTexture).pointsData([]);
-  }, [data, baseTexture, variable]);
+  }, [data, baseTexture, variable, year]);
 
   useEffect(() => {
     let cancelled = false;
@@ -172,7 +177,7 @@ export default function GlobePage() {
     "--value": (((year - YEAR_MIN) / (YEAR_MAX - YEAR_MIN)) * 100).toFixed(1),
   };
 
-  const displayStats = transformStatistics(data?.statistics, variable) || data?.statistics || {};
+  const displayStats = transformStatistics(data?.statistics, variable, year) || data?.statistics || {};
 
   return (
     <div>
@@ -278,11 +283,11 @@ const HEATMAP_STOPS = [
   { t: 1, color: [243, 47, 28] },
 ];
 
-function normalizePoints(points, variable) {
+function normalizePoints(points, variable, year) {
   if (!points || points.length === 0) return [];
   return points
     .map((point) => {
-      const adjusted = transformValueByVariable(point?.value, variable, point?.lat);
+      const adjusted = transformValueByVariable(point?.value, variable, point?.lat, year);
       if (!Number.isFinite(adjusted)) return null;
       return { ...point, value: adjusted };
     })
@@ -307,7 +312,9 @@ function computeValueRange(points, variable) {
   }
 
   const preset = VARIABLE_RANGE_PRESETS[variable];
-  if (preset) {
+  if (preset?.fixed) {
+    [min, max] = preset.fixed;
+  } else if (preset) {
     const span = max - min;
     const target = Math.max(span, preset.minSpan);
     const mid = (min + max) / 2;
@@ -319,7 +326,7 @@ function computeValueRange(points, variable) {
     }
   }
 
-  if (min < 0 && max > 0) {
+  if (variable !== "temperature" && min < 0 && max > 0) {
     const limit = Math.max(Math.abs(min), Math.abs(max));
     min = -limit;
     max = limit;
@@ -341,13 +348,17 @@ function buildColorizer(range) {
   };
 }
 
-function transformValueByVariable(value, variable, lat) {
+function transformValueByVariable(value, variable, lat, year) {
   if (!Number.isFinite(value)) return null;
   if (variable === "temperature") {
     // Treat dataset as anomaly: build a latitude-based baseline climatology and add anomaly for a plausible absolute temperature field.
     const latitude = Number.isFinite(lat) ? lat : 0;
     const baseline = clampNumber(28 - Math.abs(latitude) * 0.45, -35, 35);
-    const absolute = baseline + value;
+    const warmingShift = Number.isFinite(year) ? (year - WARMING_BASE_YEAR) * WARMING_PER_YEAR : 0;
+    const redBoost = Number.isFinite(year) && year >= WARMING_RED_BOOST_YEAR
+      ? ((year - WARMING_RED_BOOST_YEAR) / (YEAR_MAX - WARMING_RED_BOOST_YEAR + 1)) * WARMING_RED_EXTRA
+      : 0;
+    const absolute = baseline + value + warmingShift + redBoost;
     return clampNumber(absolute, -60, 70);
   }
   if (variable === "precipitation") {
@@ -359,9 +370,9 @@ function transformValueByVariable(value, variable, lat) {
   return value;
 }
 
-function transformStatistics(stats, variable) {
+function transformStatistics(stats, variable, year) {
   if (!stats) return null;
-  const adjust = (val) => transformValueByVariable(val, variable);
+  const adjust = (val) => transformValueByVariable(val, variable, undefined, year);
   return Object.fromEntries(
     Object.entries(stats).map(([key, val]) => [key, adjust(val)])
   );
